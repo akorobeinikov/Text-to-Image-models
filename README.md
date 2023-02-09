@@ -10,6 +10,9 @@ For inference was used server with following parameters:
 |-------------------|------------------|-----------------------------------------------------------------------------|
 | Stable Diffusion  | PyTorch          | [stable-diffusion](https://huggingface.co/CompVis/stable-diffusion-v1-4)    |
 
+Workflow for Stable Diffusion during inference:
+
+![image](images/stable_diffusion.png)
 ## Prerequisites
 
 Before running inference, create python environment:
