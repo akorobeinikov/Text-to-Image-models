@@ -1,11 +1,3 @@
-# Copyright 2022 The OFA-Sys Team.
-# This source code is licensed under the Apache 2.0 license
-# found in the LICENSE file in the root directory.
-# Copyright 2022 The HuggingFace Inc. team.
-# All rights reserved.
-# This source code is licensed under the Apache 2.0 license
-# found in the LICENSE file in the root directory.
-
 import inspect
 from typing import Callable, List, Optional, Union
 
@@ -13,7 +5,7 @@ import numpy as np
 import torch
 import os
 
-from transformers import CLIPFeatureExtractor, CLIPTokenizer
+from transformers import CLIPTextModel, CLIPTokenizer, CLIPFeatureExtractor
 
 from diffusers.configuration_utils import FrozenDict
 from diffusers import DDIMScheduler, LMSDiscreteScheduler, PNDMScheduler
@@ -21,37 +13,61 @@ from diffusers.utils import deprecate, logging
 from diffusers.pipelines.onnx_utils import ORT_TO_NP_TYPE, OnnxRuntimeModel
 from diffusers.schedulers import SchedulerMixin, DPMSolverMultistepScheduler, PNDMScheduler, DDIMScheduler
 
-from diffusers import OnnxStableDiffusionPipeline, DiffusionPipeline
+from diffusers import OnnxStableDiffusionPipeline, DiffusionPipeline, StableDiffusionPipeline
 from diffusers.pipelines.stable_diffusion import StableDiffusionPipelineOutput
+from diffusers import AutoencoderKL, UNet2DConditionModel, PNDMScheduler
 from openvino.runtime import Core
 from pathlib import Path
 
 logger = logging.get_logger(__name__)
 
 
+class PytorchPipeline(StableDiffusionPipeline):
+    def __init__(
+        self,
+        models_dir,
+        use_quantized=True
+    ):
+        vae = AutoencoderKL.from_pretrained(models_dir, subfolder="vae")
+        tokenizer = CLIPTokenizer.from_pretrained(models_dir, subfolder="tokenizer")
+        text_encoder = CLIPTextModel.from_pretrained(models_dir, subfolder="text_encoder")
+        if use_quantized:
+            unet = UNet2DConditionModel.from_pretrained(models_dir, subfolder="unet_quantized")
+        else:
+            unet = UNet2DConditionModel.from_pretrained(models_dir, subfolder="unet")
+        scheduler = PNDMScheduler.from_pretrained(models_dir, subfolder="scheduler")
+        super().__init__(vae, text_encoder, tokenizer, unet, scheduler, safety_checker=None, feature_extractor=None, requires_safety_checker=False)
+
+
 class OpenVINOPipeline(DiffusionPipeline):
     def __init__(
         self,
-        models_dir: Path
+        models_dir: Path,
+        use_quantized=False
     ):
+        self.use_quantized = use_quantized
         self.load_from_openvino(models_dir)
-        self.scheduler = DPMSolverMultistepScheduler.from_pretrained(os.path.join(models_dir, "scheduler"))
+        self.scheduler = PNDMScheduler.from_pretrained(os.path.join(models_dir, "scheduler"))
         self.tokenizer = CLIPTokenizer.from_pretrained(os.path.join(models_dir, "tokenizer"))
 
     def load_from_openvino(self, models_dir):
         ie = Core()
 
         # VAE decoder
-        vae_decoder_ov = ie.read_model(model=os.path.join(models_dir, "vae_decoder/IR/", "model.xml"))
+        vae_decoder_ov = ie.read_model(model=os.path.join(models_dir, "vae_decoder", "model.xml"))
         vae_decoder = ie.compile_model(model=vae_decoder_ov, device_name="CPU")
 
         # Text encoder
-        text_encoder_ov = ie.read_model(model=os.path.join(models_dir, "text_encoder/IR/", "model.xml"))
+        text_encoder_ov = ie.read_model(model=os.path.join(models_dir, "text_encoder", "model.xml"))
         text_encoder = ie.compile_model(model=text_encoder_ov, device_name="CPU")
 
         # Unet
-        unet_ov = ie.read_model(model=os.path.join(models_dir, "unet/IR/", "model.xml"))
-        unet = ie.compile_model(model=unet_ov, device_name="CPU")
+        if self.use_quantized:
+            unet_ov = ie.read_model(model=os.path.join(models_dir, "unet_quantized/ov_quantized", "model.xml"))
+            unet = ie.compile_model(model=unet_ov, device_name="CPU")
+        else:
+            unet_ov = ie.read_model(model=os.path.join(models_dir, "unet", "model.xml"))
+            unet = ie.compile_model(model=unet_ov, device_name="CPU")
 
         self.register_modules(vae_decoder=vae_decoder,
                               text_encoder=text_encoder,
