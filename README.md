@@ -39,8 +39,8 @@ Use `pytorch`, `onnx`, `openvino_onnx` and `openvino` as launcher.
 
 Results of performance experiments:
 
-| Model name        | Number of parameters   | Size of model | PyTorch time  | ONNXRuntime time | OpenVINO time |
-|-------------------|------------------------|---------------|---------------|------------------|---------------|
-| Stable Diffusion  | 1B                     | 4G            | 125 sec       | 110 sec          | 60 sec        |
+| Model name        | Number of parameters   | Size of model | PyTorch time (FP32 / INT8) | ONNXRuntime time | OpenVINO time |
+|-------------------|------------------------|---------------|----------------------------|------------------|---------------|
+| Stable Diffusion  | 1B                     | 4G            | 125 sec / 110 sec          | 110 sec          | 42 sec        |
 
 All performance measurements have been computed using `DPMSolverMultistepScheduler scheduler 50 steps`

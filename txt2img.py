@@ -70,10 +70,7 @@ class PyTorchLauncher(BaseLauncher):
     def __init__(self, models_dir, use_quantized=False) -> None:
         super().__init__(models_dir)
         device = "cpu"
-        self.pipe = custom_pipelines.PytorchPipeline(self.model_id, use_quantized=False)
-        # loaded_model = load_quantized_model("quantization_output", model=getattr(self.pipe, "unet"))
-        # loaded_model.eval()
-        # setattr(self.pipe, "unet", loaded_model)
+        self.pipe = custom_pipelines.PytorchPipeline(self.model_id, use_quantized)
         self.pipe = self.pipe.to(device)
 
     def __call__(self, prompt: str):
