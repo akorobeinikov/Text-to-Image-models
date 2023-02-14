@@ -12,7 +12,7 @@ For inference was used server with following parameters:
 
 Workflow for Stable Diffusion during inference:
 
-![image](images/stable_diffusion.png)
+![image](assets/stable_diffusion.png)
 ## Prerequisites
 
 Before running inference, create python environment:
